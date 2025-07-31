@@ -11,14 +11,16 @@
 ###############################################################################
 #                             Script CHD                                      #
 #      A partir d'un corpus texte formaté aux exigences IRAMUTEQ              #
-#                     version : 31-07-2025                                    #
+#                     version : 01-08-2025                                    #
 #                                                                             #
 #      1.Aide au paramétrage dans R de la CHD sur le corpus                   #
 #      2.Extrait chi2, rainette_explor                                        #
 #      3.Génère nuages de mots par classe                                     #
 #      4.Exporte les segments de texte par classe au format text              #
 #      5.Creation d'un concordancier au format html                           #
+#      6.Reconstruction du concordancier avec me corpus même avec la lemma    #
 #      6.Affichage de la CHD avec rainette_explor (navigateur)                #
+#                                                                             #
 ###############################################################################
 
 
@@ -92,7 +94,7 @@ lemmatisation <- TRUE   # TRUE pour activer la lemmatisation, FALSE sinon
 # "NUM" (numéral), "PART" (particule), "PRON" (pronom), "PROPN" (nom propre), "PUNCT" (ponctuation), 
 # "SCONJ" (conjonction de subordination), "SYM" (symbole), "VERB" (verbe), "X" (autre, inconnu)
 
-upos_a_conserver <- c("NOUN", "ADJ", "VERB")  # Modifier ici selon vos besoins
+upos_a_conserver <- c("NOUN", "ADJ")  # Modifier ici selon vos besoins
 
 #########################################################
 # Chargement du corpus
@@ -199,6 +201,11 @@ cat("Nombre de segments < 5 mots :", sum(longueurs < 5), "\n")
 # On ne garde que les segments non vides pour la suite
 included_segments <- docnames(dfm)
 
+### Test corpus reconstitué
+#Corpus original correspondant aux segments conservés (sans lemmatisation ni suppression de stopwords)
+corpus_affichage <- corpus[included_segments]
+### fin
+
 filtered_corpus <- corpus_lemmat[included_segments]
 docvars(filtered_corpus, "orig_doc_id") <- gsub("_.*", "", docnames(filtered_corpus))
 
@@ -218,7 +225,14 @@ print(table(docvars(filtered_corpus)$Classes))
 #########################################################
 # Extraction et export des segments par classe
 #########################################################
-segments_by_class <- split(as.character(filtered_corpus), docvars(filtered_corpus)$Classes)
+# segments_by_class <- split(as.character(filtered_corpus), docvars(filtered_corpus)$Classes)
+# Ne garder que les segments contenant au moins un terme discriminant
+segments_by_class <- lapply(split(as.character(corpus_affichage), docvars(filtered_corpus)$Classes), function(segments) {
+  segments[sapply(segments, function(segment) {
+    any(sapply(highlight_terms, function(term) grepl(paste0("\\b", term, "\\b"), segment, ignore.case = TRUE)))
+  })]
+})
+
 segments_file <- file.path(export_dir, "segments_par_classe.txt")
 writeLines(
   unlist(lapply(names(segments_by_class), function(cl) {
